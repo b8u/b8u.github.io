@@ -3,54 +3,54 @@
   xmlns:xhtml="http://www.w3.org/1999/xhtml">
   
   <url>
-    <loc>http://b8u.github.io/posts/my-first-post/</loc>
+    <loc>https://b8u.github.io/posts/my-first-post/</loc>
     <lastmod>2018-01-02T16:01:23+08:00</lastmod>
   </url>
   
   <url>
-    <loc>http://b8u.github.io/categories/</loc>
-    <lastmod>2018-01-02T16:01:23+08:00</lastmod>
-    <priority>0</priority>
-  </url>
-  
-  <url>
-    <loc>http://b8u.github.io/posts/</loc>
+    <loc>https://b8u.github.io/categories/</loc>
     <lastmod>2018-01-02T16:01:23+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://b8u.github.io/tags/</loc>
+    <loc>https://b8u.github.io/posts/</loc>
     <lastmod>2018-01-02T16:01:23+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://b8u.github.io/</loc>
+    <loc>https://b8u.github.io/tags/</loc>
     <lastmod>2018-01-02T16:01:23+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://b8u.github.io/categories/index/</loc>
+    <loc>https://b8u.github.io/</loc>
     <lastmod>2018-01-02T16:01:23+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://b8u.github.io/tags/tag-1/</loc>
+    <loc>https://b8u.github.io/categories/index/</loc>
     <lastmod>2018-01-02T16:01:23+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://b8u.github.io/tags/tag-2/</loc>
+    <loc>https://b8u.github.io/tags/tag-1/</loc>
     <lastmod>2018-01-02T16:01:23+08:00</lastmod>
     <priority>0</priority>
   </url>
   
   <url>
-    <loc>http://b8u.github.io/tags/tag-3/</loc>
+    <loc>https://b8u.github.io/tags/tag-2/</loc>
+    <lastmod>2018-01-02T16:01:23+08:00</lastmod>
+    <priority>0</priority>
+  </url>
+  
+  <url>
+    <loc>https://b8u.github.io/tags/tag-3/</loc>
     <lastmod>2018-01-02T16:01:23+08:00</lastmod>
     <priority>0</priority>
   </url>

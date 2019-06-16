@@ -1,0 +1,288 @@
+<!DOCTYPE html>
+<html lang="en-us" >
+<head>
+  <meta charset="utf-8"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+  
+  <meta name="author"
+        content="b8u"/>
+
+  
+  <meta name="description" content="Intro Довелось мне столкнуться со странной структурой данных (похожей на JSON). Она представляет собой гетерогенное дерево, каждый узел которого содержит некоторые данные и множество дочерних узлов. Особенность заключается в том, что это множество может быть как простым контейнером (std::vector) так и ассоциативным (std::map). Получается, если узел хранит дочерние узлы в мапе - это JSON Object, а если вектор - JSON Array.
+В реализации этой структуры данных меня смущала сложная иерархия классов и то, что класс, который должен храниться в этом контейнере, обязательно должен реализовывать некий интерфейс."/>
+  
+
+  
+  
+  <meta name="keywords" content="cpp, templates, programming"/>
+  
+
+  
+  <link rel="canonical" href="https://b8u.github.io/posts/template-recursion-type-ru/"/>
+
+  
+
+  <title>Рекурсивный шаблонный тип &middot; b8u Blog</title>
+
+  <link rel="shortcut icon" href="https://b8u.github.io/images/favicon.ico"/>
+  <link rel="stylesheet" href="https://b8u.github.io/css/animate.min.css"/>
+  <link rel="stylesheet" href="https://b8u.github.io/css/remixicon.css"/>
+  <link rel="stylesheet" href="https://b8u.github.io/css/zozo.css"/>
+  <link rel="stylesheet" href="https://b8u.github.io/css/highlight.css"/>
+
+  
+  
+</head>
+
+<body>
+<div class="main animated">
+  <div class="nav_container animated fadeInDown">
+  <div class="site_nav" id="site_nav">
+    <ul>
+      
+      <li>
+        <a href="/">blog</a>
+      </li>
+      
+      <li>
+        <a href="/posts/">archive</a>
+      </li>
+      
+      <li>
+        <a href="/tags/">tags</a>
+      </li>
+      
+      <li>
+        <a href="/about/">about</a>
+      </li>
+      
+    </ul>
+  </div>
+  <div class="menu_icon">
+    <a id="menu_icon"><i class="remixicon-links-line"></i></a>
+  </div>
+</div>
+
+  <div class="header animated fadeInDown">
+  <div class="site_title_container">
+    <div class="site_title">
+      <h1>
+        <a href="https://b8u.github.io/">
+          <span>b8u Blog</span>
+          <img src="https://b8u.github.io/images/logo.svg"/>
+        </a>
+      </h1>
+    </div>
+    <div class="description">
+      <p class="sub_title"></p>
+      <div class="my_socials">
+        
+        <a href="https://b8u.github.io/index.xml" type="application/rss+xml" title="rss" target="_blank"><i class="remixicon-rss-fill"></i></a>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <div class="content">
+    <div class="post_page">
+      <div class="post animated fadeInDown">
+        <div class="post_title post_detail_title">
+          <h2><a href='/posts/template-recursion-type-ru/'>Рекурсивный шаблонный тип</a></h2>
+          <span class="date">2019.06.09</span>
+        </div>
+        <div class="post_content markdown">
+
+<h2 id="intro">Intro</h2>
+
+<p>Довелось мне столкнуться со странной структурой данных (похожей на JSON). Она представляет собой гетерогенное дерево, каждый узел которого содержит некоторые данные и множество дочерних узлов. Особенность заключается в том, что это множество может быть как простым контейнером (<code>std::vector</code>) так и ассоциативным (<code>std::map</code>). Получается, если узел хранит дочерние узлы в мапе - это JSON Object, а если вектор - JSON Array.</p>
+
+<p>В реализации этой структуры данных меня смущала сложная иерархия классов и то, что класс, который должен храниться в этом контейнере, обязательно должен реализовывать некий интерфейс.</p>
+
+<p>В этой статье я представлю альтернативу описанному выше.</p>
+
+<h2 id="реализация">Реализация</h2>
+
+<p>Узел будет хранить данные как <code>std::variant</code> от допустимых данных.</p>
+
+<pre><code class="language-cpp">class node
+{
+public:
+	using value_type = std::variant&lt;int, double...&gt;
+	value_type payload;
+};
+</code></pre>
+
+<p>Будем использовать данный класс для узлов не имеющих дочерних узлов.</p>
+
+<pre><code class="language-cpp">class node_object : public node
+{
+	using children_type = std::variant&lt;node_object, node_array, node&gt;;
+	std::map&lt;children_type&gt; children;
+};
+
+class node_array : public node
+{
+	using children_type = std::variant&lt;node_object, node_array, node&gt;;
+	std::vector&lt;children_type&gt; children;
+};
+</code></pre>
+
+<p>В реализации <code>node_object</code> и <code>node_array</code> возникают проблемы с рекурсивным определением типов (один содержит другой). Конечно, можно использовать указатели, но это не наш путь. Для объявления зависимых типов будем использовать шаблон:</p>
+
+<pre><code class="language-cpp">template &lt;typename Settings&gt;
+class node_object { using children_type = typename Settings::children_type; ... };
+
+template &lt;typename Settings&gt;
+class node_array  { using children_type = typename Settings::children_type; ... };
+</code></pre>
+
+<p>Чтобы специализировать типы узлов в одном типе - специализируем узлы этим же типом:</p>
+
+<pre><code class="language-cpp">template &lt; // Каждый аргумент шаблона - шаблонный тип с одним аргументом.
+	template &lt;typename&gt; typename Map,
+	template &lt;typename&gt; typename Array,
+	template &lt;typename&gt; typename Variant
+	&gt;
+struct __node_settings
+{
+	// Нам не нужно специализировать тип структуры внутри самой себя.
+	using map_type      = Map    &lt; __node_settings&gt;;
+	using array_type    = Array  &lt; __node_settings&gt;;
+	using children_type = Variant&lt; __node_settings&gt;;
+};
+</code></pre>
+
+<p>Осталось вывести <code>children_type</code>, который должен быть <code>std::variant&lt;node, node_object, node_array&gt;</code>. <code>node</code> нам известен изначально, а два оставшихся типов определены в <code>__node_settings</code>. Если шаблонизировать последний тип аналогично типам узлов, задача легко решается:</p>
+
+<pre><code class="language-cpp">template &lt;typename Settings&gt;
+using __node_variant =
+	std::variant&lt;
+		typename Settings::map_type,
+		typename Settings::array_type,
+		node
+		&gt;;
+</code></pre>
+
+<p>Если переименовать шаблонные типы узлов, в результате получаем:</p>
+
+<pre><code class="language-cpp">using __settings_helper = __node_settings&lt;__node_map, __node_array, __node_variant&gt;;
+
+using node_map = __settings_helper::map_type;
+using node_array = __settings_helper::map_array;
+</code></pre>
+
+<p>Таким образом каждый узел может хранить по значению любой другой тип узла (включая себя самого).</p>
+
+<h2 id="пример-использования">Пример использования</h2>
+
+<p>В случае использования приведенных выше классов, получение узла выглядит достаточно громоздко и нужно знать тип каждого узла. Для определения типа <code>std::variant</code> имеет метод <code>index()</code> (возвращает индекс хранимого типа в порядке определения шаблона варианта) и <code>std::get_if&lt;&gt;</code> (возвращает тип <code>std::add_pointer_t&lt;&gt;</code>).</p>
+
+<p>Если это мешает, всегда можно обернуть это в API.</p>
+
+<pre><code class="language-cpp">node_map m;
+m.children[&quot;primitive&quot;] = node{};
+m.children[&quot;array&quot;] = node_array{};
+std::get&lt;node_array&gt;(m.children[&quot;array&quot;])
+	.children.push_back(node{});
+std::get&lt;node_array&gt;(m.children[&quot;array&quot;])
+	.children.push_back(node_map{});
+std::get&lt;node_map&gt;(std::get&lt;node_array&gt;(m.children[&quot;array&quot;])
+	.children[1]).children[&quot;primitive&quot;] = node{};
+</code></pre>
+
+<h2 id="как-это-работает">Как это работает</h2>
+
+<p>Стандарт гласит:</p>
+
+<blockquote>
+<p>3 Unless a member of a class template or a member template has been explicitly instantiated or explicitly specialized, the specialization of the member is implicitly instantiated when the specialization is referenced in a context that requires the member definition to exist or if the existence of the definition of the member affects the semantics of the program; in particular, the initialization (and any associated side effects) of a static data member does not occur unless the static data member is itself used in a way that requires the definition of the static data member to exist.
+4 Unless a function template specialization has been explicitly instantiated or explicitly specialized, the function template specialization is implicitly instantiated when the specialization is referenced in a context that requires a function definition to exist or if the existence of the definition affects the semantics of the program. A function whose declaration was instantiated from a friend function definition is implicitly instantiated when it is referenced in a context that requires a function definition to exist or if the existence of the definition affects the semantics of the program. Unless a call is to a function template explicit specialization or to a member function of an explicitly specialized class template, a default argument for a function template or a member function of a class template is implicitly instantiated when the function is called in a context that requires the value of the default argument.
+5 [Example:</p>
+
+<pre><code class="language-cpp">template&lt;class T&gt; struct Z {
+	void f();
+	void g();
+};
+
+void h() {
+	Z&lt;int&gt; a;     // instantiation of class Z&lt;int&gt; required
+	Z&lt;char&gt;* p;   // instantiation of class Z&lt;char&gt; not required
+	Z&lt;double&gt;* q; // instantiation of class Z&lt;double&gt; not required
+	a.f();        // instantiation of Z&lt;int&gt;::f() required
+	p-&gt;g();       // instantiation of class Z&lt;char&gt; required, and
+	              // instantiation of Z&lt;char&gt;::g() required
+}
+</code></pre>
+
+<p>Nothing in this example requires class Z<double>, Z<int>::g(), or Z<char>::f() to be implicitly instantiated.
+—end example]
+<div style="text-align: right">
+<a href="https://github.com/cplusplus/draft/blob/master/papers/n4810.pdf">Working Draft, Standard for Programming Language C++ N4810</a>
+</div></p>
+</blockquote>
+
+<p>Другими словами, внутри объявления узла мы знаем тип самого узла и нам нужен только тип другого, который содержится в параметре шаблона. Каждый узел использует только часть типов определенных в настройках (получаемых через шаблон), что позволяет нам специализировать все типы, а в момент использования, компилятору остается лишь определить тип.</p>
+
+<p>Схема для наглядности:
+<img src="/images/template-recursion-diagram.svg" alt="diagram" /></p>
+
+<h2 id="эпилог">Эпилог</h2>
+
+<p>В общем, данную технику можно использовать в любых ситуациях, когда нужно получить тип, зависимый от текущего типа. Это могут быть шаблонные интерфейсы, структуры данных с зависимыми типами, любые случаи когда хочется избежать виртуальных вызовов (который достаточно дорог относительно прямого вызова или вызова по указателю).</p>
+
+<p>С другой стороны, такой код дольше компилируется (а если переборщить с шаблонами, компилятор будет сжирать огромное количество памяти). Это можно как-то оптимизировать, но это дополнительные усилия. В большинстве случаев, такая реализация - попытка обойти стандартные механизмы языка (наследование и виртуальные методы), что усложняет понимание программы (а программы читают намного чаще, нежели пишут их). Я не стану рекомендовать эту технику повсеместно, но иногда она бывает полезной.</p>
+</div>
+        <div class="post_footer">
+          
+          <div class="meta">
+            <div class="info">
+              <span class="field tags">
+                <i class="remixicon-stack-line"></i>
+                
+                <a href="https://b8u.github.io/tags/template/">template</a>
+                
+                <a href="https://b8u.github.io/tags/cpp/">cpp</a>
+                
+              </span>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+      
+      
+    </div>
+  </div>
+  <a id="back_to_top" href="#" class="back_to_top"><span>△</span></a>
+</div>
+<footer class="footer">
+  <div class="powered_by">
+    <a href="https://zeuk.me">Designed by Zeuk,</a>
+    <a href="http://www.gohugo.io/">Proudly published with Hugo</a>
+  </div>
+
+  <div class="footer_slogan">
+    <span></span>
+  </div>
+</footer>
+
+
+
+<script src="https://b8u.github.io/js/jquery-3.3.1.min.js"></script>
+<script src="https://b8u.github.io/js/zozo.js"></script>
+<script src="https://b8u.github.io/js/highlight.pack.js"></script>
+<link  href="https://b8u.github.io/css/fancybox.min.css" rel="stylesheet">
+<script src="https://b8u.github.io/js/fancybox.min.js"></script>
+
+<script>hljs.initHighlightingOnLoad()</script>
+
+
+
+
+
+
+
+</body>
+</html>

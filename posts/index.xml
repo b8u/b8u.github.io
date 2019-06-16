@@ -6,18 +6,19 @@
     <description>Recent content in Posts on b8u Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Mon, 01 Jan 2018 16:01:23 +0800</lastBuildDate>
+    <lastBuildDate>Sun, 09 Jun 2019 16:01:23 +0800</lastBuildDate>
     
 	<atom:link href="https://b8u.github.io/posts/index.xml" rel="self" type="application/rss+xml" />
     
     
     <item>
-      <title>An Example Post</title>
-      <link>https://b8u.github.io/posts/my-first-post/</link>
-      <pubDate>Mon, 01 Jan 2018 16:01:23 +0800</pubDate>
+      <title>Рекурсивный шаблонный тип</title>
+      <link>https://b8u.github.io/posts/template-recursion-type-ru/</link>
+      <pubDate>Sun, 09 Jun 2019 16:01:23 +0800</pubDate>
       
-      <guid>https://b8u.github.io/posts/my-first-post/</guid>
-      <description>skdafjhaskjdfha sadifkhaskl sadkfalksj sadkfjkalsjdhflkajshdlkfjh</description>
+      <guid>https://b8u.github.io/posts/template-recursion-type-ru/</guid>
+      <description>Intro Довелось мне столкнуться со странной структурой данных (похожей на JSON). Она представляет собой гетерогенное дерево, каждый узел которого содержит некоторые данные и множество дочерних узлов. Особенность заключается в том, что это множество может быть как простым контейнером (std::vector) так и ассоциативным (std::map). Получается, если узел хранит дочерние узлы в мапе - это JSON Object, а если вектор - JSON Array.
+В реализации этой структуры данных меня смущала сложная иерархия классов и то, что класс, который должен храниться в этом контейнере, обязательно должен реализовывать некий интерфейс.</description>
     </item>
     
   </channel>

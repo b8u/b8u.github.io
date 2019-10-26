@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html lang="en-us" >
+<head>
+  <meta charset="utf-8"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+  
+  <meta name="author"
+        content="b8u"/>
+
+  
+  <meta name="description" content="Intro В библиотеке DirectXMath есть тип XMVector, который использует SIMD инструкции, для обеспечения большей производительности. Есть у него один недостаток - это упакованные данные и для получения привычного представления вектора (как скажем в glm), необходима конвертация через функции XMStore*/XMLoad*. Таких типов достаточно много и писать обертки к каждому дело утомительное, но можно поупражняться в шаблонах для автоматической генерации оберток.
+Следует отметить, что использование кода ниже может привести к падению производительности вашего приложения."/>
+  
+
+  
+  
+  <meta name="keywords" content="cpp, templates, programming"/>
+  
+
+  
+  <link rel="canonical" href="https://b8u.github.io/posts/xmvector-wrapper-generation-ru/"/>
+
+  
+
+  <title>Генерация обертки XMVector на шаблонах &middot; b8u Blog</title>
+
+  <link rel="shortcut icon" href="https://b8u.github.io/images/favicon.ico"/>
+  <link rel="stylesheet" href="https://b8u.github.io/css/animate.min.css"/>
+  <link rel="stylesheet" href="https://b8u.github.io/css/remixicon.css"/>
+  <link rel="stylesheet" href="https://b8u.github.io/css/zozo.css"/>
+  <link rel="stylesheet" href="https://b8u.github.io/css/highlight.css"/>
+
+  
+  
+</head>
+
+<body>
+<div class="main animated">
+  <div class="nav_container animated fadeInDown">
+  <div class="site_nav" id="site_nav">
+    <ul>
+      
+      <li>
+        <a href="/">blog</a>
+      </li>
+      
+      <li>
+        <a href="/posts/">archive</a>
+      </li>
+      
+      <li>
+        <a href="/tags/">tags</a>
+      </li>
+      
+      <li>
+        <a href="/about/">about</a>
+      </li>
+      
+    </ul>
+  </div>
+  <div class="menu_icon">
+    <a id="menu_icon"><i class="remixicon-links-line"></i></a>
+  </div>
+</div>
+
+  <div class="header animated fadeInDown">
+  <div class="site_title_container">
+    <div class="site_title">
+      <h1>
+        <a href="https://b8u.github.io/">
+          <span>b8u Blog</span>
+          <img src="https://b8u.github.io/images/logo.svg"/>
+        </a>
+      </h1>
+    </div>
+    <div class="description">
+      <p class="sub_title"></p>
+      <div class="my_socials">
+        
+        <a href="https://b8u.github.io/index.xml" type="application/rss+xml" title="rss" target="_blank"><i class="remixicon-rss-fill"></i></a>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <div class="content">
+    <div class="post_page">
+      <div class="post animated fadeInDown">
+        <div class="post_title post_detail_title">
+          <h2><a href='/posts/xmvector-wrapper-generation-ru/'>Генерация обертки XMVector на шаблонах</a></h2>
+          <span class="date">2019.08.05</span>
+        </div>
+        <div class="post_content markdown">
+
+<h2 id="intro">Intro</h2>
+
+<p>В библиотеке DirectXMath есть тип XMVector, который использует <a href="https://ru.wikipedia.org/wiki/SIMD">SIMD</a> инструкции, для обеспечения большей производительности. Есть у него один недостаток - это упакованные данные и для получения привычного представления вектора (как скажем в glm), необходима конвертация через функции <code>XMStore*</code>/<code>XMLoad*</code>. Таких типов достаточно много и писать обертки к каждому дело утомительное, но можно поупражняться в шаблонах для автоматической генерации оберток.</p>
+
+<p><em>Следует отметить, что использование кода ниже может привести к падению производительности вашего приложения.</em></p>
+
+<h2 id="постановка-задачи">Постановка задачи</h2>
+
+<p>Типичным представителем пары функций Store/Load являются:</p>
+
+<pre><code class="language-cpp">_Use_decl_annotations_ inline XMVECTOR XM_CALLCONV XMLoadFloat2(const XMFLOAT2* pSource)
+_Use_decl_annotations_ inline void     XM_CALLCONV XMStoreFloat2(XMFLOAT2* pDestination, FXMVECTOR  V)
+</code></pre>
+
+<p>Наша задача сгенерировать код класса по такому шаблону:</p>
+
+<pre><code class="language-cpp">using Vector2f = VectorImpl&lt;&amp;DirectX::XMLoadFloat2, &amp;DirectX::XMStoreFloat2&gt;;
+using Vector3i = VectorImpl&lt;&amp;DirectX::XMLoadSInt3,  &amp;DirectX::XMStoreSInt3&gt;;
+using Vector4u = VectorImpl&lt;&amp;DirectX::XMLoadUInt4,  &amp;DirectX::XMStoreUInt4&gt;;
+</code></pre>
+
+<p>Эти классы должны:</p>
+
+<ol>
+<li>предоставлять доступ к данным через <code>operator[](size_t)</code></li>
+<li>через публичные члены класса <code>.x</code>, <code>.y</code>, <code>.z</code>, <code>.w</code>.</li>
+<li>было бы не плохо перегрузить арифметику и</li>
+<li>варианты конвертации в другие размерности для данного типа (vec2 -&gt; vec4 -&gt; vec3).</li>
+</ol>
+
+<h3 id="для-этого-нам-потребуется">Для этого нам потребуется:</h3>
+
+<ol>
+<li>Получить тип вектора (<code>XMFLOAT2</code>, <code>XMFLOAT3</code>, &hellip;).</li>
+<li>Размерность данного вектора (2, 3 или 4 компонента).</li>
+<li>Тип компонента (float, int, unsigned int).</li>
+<li>Наследоваться от данного вектора.</li>
+</ol>
+
+<h2 id="реализация">Реализация</h2>
+
+<h3 id="1-получение-типа-вектора">1. Получение типа вектора.</h3>
+
+<p>Будем брать типы из функций преобразования векторов в/из SIMD вид/вида. Для этого можно воспользоваться <a href="https://www.boost.org/doc/libs/1_70_0/libs/type_traits/doc/html/boost_typetraits/reference/function_traits.html">boost::type_traits</a>:</p>
+
+<pre><code class="language-cpp">using VectorN = typename function_traits&lt;DirectX::XMLoadFloat2&gt;::arg1_type
+</code></pre>
+
+<p>Или напишем свой класс:</p>
+
+<pre><code class="language-cpp">template &lt;typename T&gt;
+struct FunctionInfo; 
+
+template &lt;typename Res, typename... Args&gt;
+struct FunctionInfo&lt;Res XM_CALLCONV(Args...)&gt;
+{
+    using Result = Res;
+    using Arguments = std::tuple&lt;Args...&gt;;
+};
+
+using VectorN = std::tuple_element_t&lt;typename FunctionInfo&lt;DirectX::XMLoadFloat2&gt;::Arguments&gt;;
+</code></pre>
+
+<p>Разберем как это работает:</p>
+
+<ol>
+<li>Сначала определим шаблонный класс без тела (forward declaration).</li>
+<li>Специализируем его для конкретного случая (T - сигнатура функции). Стоит отметить, что нужно учитывать все, что относится к сигнатуре включая модификаторы (такие как константность и прочее ). Именно поэтому спецификация шаблона включает <code>XM_CALLCONV</code>. Если вы пишите универсальную библиотеку (как boost::type_traits), вам придется написать тонну специализаций для каждой возможной комбинации.</li>
+<li>Сохраняем типы аргументов в псевдониме <code>Arguments</code> как <code>std::tuple</code> т.к. лень писать геттер типа по индексу, а <code>std::tuple</code> имеет все готовое.</li>
+<li>Исходный класс должен оставаться неопределенным и генерировать ошибку, в случае попадания в аргумент шаблона неподходящего типа. Можно определить его с <code>static_assert(false, &quot;some human readable description&quot;)</code> для большей читаемости.</li>
+</ol>
+
+<h3 id="2-получение-размерности-вектора">2. Получение размерности вектора.</h3>
+
+<p>Идея, как это сделать, была украдена из замечательной библиотеки <a href="https://github.com/apolukhin/magic_get">magic_get</a> <a href="https://github.com/apolukhin">Антона Полухина</a>. Идея в следующем:</p>
+
+<ul>
+<li>Каждый класс или структура имеет конструктор (определенный явно или сгенерированный компилятором).</li>
+<li>Все <a href="https://en.wikipedia.org/wiki/Passive_data_structure">PODы</a> имеют один конструктор, который принимает в качестве аргументов все поля данной структуры.</li>
+<li>Совершенно случайно все интересующие нас типы - PODы.</li>
+</ul>
+
+<p>Другими словами, если мы знаем сигнатуру конструктора с максимальным количеством аргументов (помимо него компилятор сгенерирует прочие возможные конструкторы), мы получим число элементов в структуре и их типы. Т.е. задача сводится к нахождению максимальной сигнатуры контруктора для данного PODа. Используя C++ стандарта ниже 17 - это достаточно утомительная задача, но выполнимая (нужно генерировать много однотипного кода). Я использовал следующий вспомогательный класс:</p>
+
+<pre><code class="language-cpp">template &lt;auto load, auto store&gt;
+struct VectorInfo
+{
+    using InfoLoad = FunctionInfo&lt;std::remove_pointer_t&lt;decltype(load)&gt;&gt;;
+    using InfoStore = FunctionInfo&lt;std::remove_pointer_t&lt;decltype(store)&gt;&gt;;
+
+    // Класс который можно привести к любому типу.
+    // Мы не компилируем его, а только используем во время компиляции,
+    // поэтому реализация оператора нам не нужна.
+    struct Placeholder
+    {
+        template &lt;class Type&gt; constexpr operator Type() const noexcept;
+    };
+
+    // Функция возвращает количество свойств (мемберов) PODа.
+    template &lt;typename Class, typename... TArgs&gt;
+    static constexpr size_t count()
+    {
+        // Можем впихнуть больше?
+        constexpr const bool is_next = 
+            std::is_constructible_v&lt;Class, Placeholder, TArgs...&gt;;
+        // Можем вызвать конструктор с текущим набором аргументов?
+        constexpr const bool is_current =
+             std::is_constructible_v&lt;Class, TArgs...&gt;;
+
+        // Рекурсивно вызываем себя для большего набора аргументов, пока не упремся.
+        if constexpr (is_next || !is_current) {
+            return count&lt;Class, Placeholder, TArgs...&gt;();
+        } else {
+            return sizeof...(TArgs);
+        }
+    }
+};
+</code></pre>
+
+<h3 id="3-тип-компоненты-вектора">3. Тип компоненты вектора.</h3>
+
+<p>Честно говоря, тут я срезал углы т.к. в моем случае не так много вариаций:</p>
+
+<pre><code class="language-cpp">// I - количество компонент в векторе (вычисляем в предыдущем пункте).
+// Class - тип самого вектора (определяем в пером пункте).
+template &lt;size_t I, typename Class&gt;
+static constexpr auto returnFirst()
+{
+    static_assert(I &gt; 1 &amp;&amp; I &lt; 5);
+    if constexpr (I == 2) {
+        auto [x, y] = Class{};
+        return x;
+    }
+    if constexpr (I == 3) {
+        auto [x, y, z] = Class{};
+        return x;
+    }
+    if constexpr (I == 4) {
+        auto [x, y, z, w] = Class{};
+        return x;
+    }
+}
+</code></pre>
+
+<p>Для получения всех компонент используется <a href="https://en.cppreference.com/w/cpp/language/structured_binding">structured binding declaration</a> из C++17. Это работает только для PODов, но нам большего и не нужно. Есть возможность написать универсальную функцию т.к. мы знаем количество компонент и можем сгенерировать выражения в теле <code>if constexpr</code>, но сейчас остановимся на этом.</p>
+
+<p>Эта функция возвращает x для любого типа вектора (наши вектора гомогенны). Получить тип компоненты можно следующим образом:</p>
+
+<pre><code class="language-cpp">using Component = decltype(returnFirst&lt;length, VectorN&gt;());
+</code></pre>
+
+<p>Тут все достаточно стандартно.</p>
+
+<h3 id="4-наследование-и-финальный-интерфейс">4. Наследование и финальный интерфейс.</h3>
+
+<pre><code class="language-cpp">template &lt;auto load, auto store, typename Info = VectorInfo&lt;load, store&gt;&gt;
+struct VectorImpl : Info::VectorN, Info
+{
+    using Vector = typename Info::Vector;
+    using VectorN = typename Info::VectorN;
+    using Component = typename Info::Component;
+    static const constexpr size_t length = Info::length;
+
+    using VectorN::VectorN;
+
+    constexpr VectorImpl() = default;
+    constexpr VectorImpl(const VectorImpl&amp;) = default;
+    constexpr VectorImpl(VectorImpl&amp;&amp;) = default;
+
+    VectorImpl(Vector vector) { *this = vector; }
+    VectorImpl&amp; operator=(const VectorImpl&amp; vec) = default;
+    inline VectorImpl&amp; operator=(Vector vector)
+    {
+        this-&gt;store_(this, vector);
+        return *this;
+    }
+
+
+    inline operator VectorN() const { return *this; }
+    inline operator Vector() const { return this-&gt;load_(this); }
+    inline VectorImpl&amp; operator+=(Vector add) { return *this = DirectX::XMVectorAdd(*this, add); }
+    inline VectorImpl&amp; operator-=(Vector sub) { return *this = DirectX::XMVectorSubtract(*this, sub); }
+    inline VectorImpl&amp; operator*=(Vector mul) { return *this = DirectX::XMVectorMultiply(*this, mul); }
+    inline VectorImpl&amp; operator/=(Vector div) { return *this = DirectX::XMVectorDivide(*this, div); }
+    inline Component&amp; operator[](size_t i)
+    {
+        assert(length &gt; i);
+        std::byte* begin = reinterpret_cast&lt;std::byte*&gt;(this);
+        Component* component = reinterpret_cast&lt;Component*&gt;(begin + i * sizeof(Component));
+        return *component;
+    }
+    inline const Component&amp; operator[](size_t i) const
+    {
+        assert(length &gt; i);
+        const std::byte* begin = reinterpret_cast&lt;const std::byte*&gt;(this);
+        const Component* component = reinterpret_cast&lt;const Component*&gt;(begin + i * sizeof(Component));
+        return *component;
+    }
+
+    friend inline VectorImpl operator+(const VectorImpl&amp; left, Vector right)
+    {
+        VectorImpl tmp = left;
+        tmp += right;
+        return tmp;
+    }
+    friend inline VectorImpl operator-(const VectorImpl&amp; left, Vector right)
+    {
+        VectorImpl tmp = left;
+        tmp -= right;
+        return tmp;
+    }
+    friend inline VectorImpl operator*(const VectorImpl&amp; left, Vector right)
+    {
+        VectorImpl tmp = left;
+        tmp *= right;
+        return tmp;
+    }
+    friend inline VectorImpl operator/(const VectorImpl&amp; left, Vector right)
+    {
+        VectorImpl tmp = left;
+        tmp /= right;
+        return tmp;
+    }
+    friend inline bool operator==(const VectorImpl&amp; left, const VectorImpl&amp; right)
+    {
+        for (size_t i = 0; i &lt; left.length; ++i) { if (left[i] != right[i]) return false; } return true;
+    }
+};
+</code></pre>
+
+<h2 id="эпилог">Эпилог</h2>
+
+<p>Это больше бессмысленно, чем практически полезно. Самое интересное - игры с шаблонами и получение различной информации о типах во время компиляции. Надеюсь, это интересно не только мне.</p>
+</div>
+        <div class="post_footer">
+          
+          <div class="meta">
+            <div class="info">
+              <span class="field tags">
+                <i class="remixicon-stack-line"></i>
+                
+                <a href="https://b8u.github.io/tags/template/">template</a>
+                
+                <a href="https://b8u.github.io/tags/cpp/">cpp</a>
+                
+              </span>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+      
+      
+    </div>
+  </div>
+  <a id="back_to_top" href="#" class="back_to_top"><span>△</span></a>
+</div>
+<footer class="footer">
+  <div class="powered_by">
+    <a href="https://zeuk.me">Designed by Zeuk,</a>
+    <a href="http://www.gohugo.io/">Proudly published with Hugo</a>
+  </div>
+
+  <div class="footer_slogan">
+    <span></span>
+  </div>
+</footer>
+
+
+
+<script src="https://b8u.github.io/js/jquery-3.3.1.min.js"></script>
+<script src="https://b8u.github.io/js/zozo.js"></script>
+<script src="https://b8u.github.io/js/highlight.pack.js"></script>
+<link  href="https://b8u.github.io/css/fancybox.min.css" rel="stylesheet">
+<script src="https://b8u.github.io/js/fancybox.min.js"></script>
+
+<script>hljs.initHighlightingOnLoad()</script>
+
+
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-109070441-2', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+
+
+
+</body>
+</html>

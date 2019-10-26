@@ -6,10 +6,20 @@
     <description>Recent content on b8u Blog</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-us</language>
-    <lastBuildDate>Mon, 10 Jun 2019 15:00:37 +0200</lastBuildDate>
+    <lastBuildDate>Mon, 05 Aug 2019 21:18:48 +0200</lastBuildDate>
     
 	<atom:link href="https://b8u.github.io/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Генерация обертки XMVector на шаблонах</title>
+      <link>https://b8u.github.io/posts/xmvector-wrapper-generation-ru/</link>
+      <pubDate>Mon, 05 Aug 2019 21:18:48 +0200</pubDate>
+      
+      <guid>https://b8u.github.io/posts/xmvector-wrapper-generation-ru/</guid>
+      <description>Intro В библиотеке DirectXMath есть тип XMVector, который использует SIMD инструкции, для обеспечения большей производительности. Есть у него один недостаток - это упакованные данные и для получения привычного представления вектора (как скажем в glm), необходима конвертация через функции XMStore*/XMLoad*. Таких типов достаточно много и писать обертки к каждому дело утомительное, но можно поупражняться в шаблонах для автоматической генерации оберток.
+Следует отметить, что использование кода ниже может привести к падению производительности вашего приложения.</description>
+    </item>
     
     <item>
       <title>About</title>

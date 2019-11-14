@@ -5,11 +5,21 @@
     <link>https://b8u.github.io/categories/cpp/</link>
     <description>Recent content in cpp on b8u Blog</description>
     <generator>Hugo -- gohugo.io</generator>
-    <language>en-us</language>
-    <lastBuildDate>Mon, 05 Aug 2019 21:18:48 +0200</lastBuildDate>
+    <language>ru</language>
+    <lastBuildDate>Tue, 29 Oct 2019 20:01:32 +0100</lastBuildDate>
     
 	<atom:link href="https://b8u.github.io/categories/cpp/index.xml" rel="self" type="application/rss+xml" />
     
+    
+    <item>
+      <title>Структура передачи последнего стейта потоку</title>
+      <link>https://b8u.github.io/posts/concurent-last-state/</link>
+      <pubDate>Tue, 29 Oct 2019 20:01:32 +0100</pubDate>
+      
+      <guid>https://b8u.github.io/posts/concurent-last-state/</guid>
+      <description>Intro и постановка задачи Возникла у меня задача передавать данные между потоками со следующими условиями:
+ Любой пакет не зависит от предыдущего. Новый пакет отменяет значение предыдущего. Пакет может быть сформирован лишь в определенный момент времени (не по запросу потребителя).  Другими словами есть некоторый снепшот состояния подсистемы, который уникален для каждого отрезка времени. Другой подсистеме нужно получать последнее доступное состояние (в любой момент времени). Решение получилось достаточно интересным, чем и решил поделиться с общественностью.</description>
+    </item>
     
     <item>
       <title>Генерация обертки XMVector на шаблонах</title>

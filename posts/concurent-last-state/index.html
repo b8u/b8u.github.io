@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ru" >
+<head>
+  <meta charset="utf-8"/>
+  <meta http-equiv="X-UA-Compatible" content="IE=edge,chrome=1"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+
+  
+  <meta name="author"
+        content="b8u"/>
+
+  
+  <meta name="description" content="Intro и постановка задачи Возникла у меня задача передавать данные между потоками со следующими условиями:
+ Любой пакет не зависит от предыдущего. Новый пакет отменяет значение предыдущего. Пакет может быть сформирован лишь в определенный момент времени (не по запросу потребителя).  Другими словами есть некоторый снепшот состояния подсистемы, который уникален для каждого отрезка времени. Другой подсистеме нужно получать последнее доступное состояние (в любой момент времени). Решение получилось достаточно интересным, чем и решил поделиться с общественностью."/>
+  
+
+  
+  
+  <meta name="keywords" content="cpp, templates, programming"/>
+  
+
+  
+  <link rel="canonical" href="https://b8u.github.io/posts/concurent-last-state/"/>
+
+  
+
+  <title>Структура передачи последнего стейта потоку &middot; b8u Blog</title>
+
+  <link rel="shortcut icon" href="https://b8u.github.io/images/favicon.ico"/>
+  <link rel="stylesheet" href="https://b8u.github.io/css/animate.min.css"/>
+  <link rel="stylesheet" href="https://b8u.github.io/css/remixicon.css"/>
+  <link rel="stylesheet" href="https://b8u.github.io/css/zozo.css"/>
+  <link rel="stylesheet" href="https://b8u.github.io/css/highlight.css"/>
+
+  
+  
+</head>
+
+<body>
+<div class="main animated">
+  <div class="nav_container animated fadeInDown">
+  <div class="site_nav" id="site_nav">
+    <ul>
+      
+      <li>
+        <a href="/">blog</a>
+      </li>
+      
+      <li>
+        <a href="/posts/">archive</a>
+      </li>
+      
+      <li>
+        <a href="/tags/">tags</a>
+      </li>
+      
+      <li>
+        <a href="/about/">about</a>
+      </li>
+      
+    </ul>
+  </div>
+  <div class="menu_icon">
+    <a id="menu_icon"><i class="remixicon-links-line"></i></a>
+  </div>
+</div>
+
+  <div class="header animated fadeInDown">
+  <div class="site_title_container">
+    <div class="site_title">
+      <h1>
+        <a href="https://b8u.github.io/">
+          <span>b8u Blog</span>
+          <img src="https://b8u.github.io/images/logo.svg"/>
+        </a>
+      </h1>
+    </div>
+    <div class="description">
+      <p class="sub_title"></p>
+      <div class="my_socials">
+        
+        <a href="https://b8u.github.io/index.xml" type="application/rss+xml" title="rss" target="_blank"><i class="remixicon-rss-fill"></i></a>
+      </div>
+    </div>
+  </div>
+</div>
+
+  <div class="content">
+    <div class="post_page">
+      <div class="post animated fadeInDown">
+        <div class="post_title post_detail_title">
+          <h2><a href='/posts/concurent-last-state/'>Структура передачи последнего стейта потоку</a></h2>
+          <span class="date">2019.10.29</span>
+        </div>
+        <div class="post_content markdown">
+
+<h2 id="intro-и-постановка-задачи">Intro и постановка задачи</h2>
+
+<p>Возникла у меня задача передавать данные между потоками со следующими условиями:</p>
+
+<ul>
+<li>Любой пакет не зависит от предыдущего.</li>
+<li>Новый пакет отменяет значение предыдущего.</li>
+<li>Пакет может быть сформирован лишь в определенный момент времени (не по запросу потребителя).</li>
+</ul>
+
+<p>Другими словами есть некоторый снепшот состояния подсистемы, который уникален для каждого отрезка времени. Другой подсистеме нужно получать последнее доступное состояние (в любой момент времени). Решение получилось достаточно интересным, чем и решил поделиться с общественностью.</p>
+
+<h2 id="реализация">Реализация</h2>
+
+<p>Основная проблема в том, что &ldquo;производитель&rdquo; не может быть приостановлен или опрошен (у него просто нет механизмов для коммуникации типа event-loop). Усугубляется дело тем, что пакеты он генерирует с очень высокой частотой (порядка сотни в секунду).
+<br />
+<br />
+&ldquo;Потребитель&rdquo; работает в N раз медленнее, но, при необходимости, должен получать последнее состояние и обработать его (вычитка, преобразование, сжатие) т.е. обработка полученных данных может занять больше времени, чем их генерация &ldquo;производителем&rdquo;.
+<br />
+<br />
+Для решения потребовалось 3 буфера, один <code>std::atomic&lt;Buffer*&gt;</code> (SyncPtr) и две операции <code>std::atomic_exchange</code>.</p>
+
+<p>Сценарий работы следующий:</p>
+
+<ol>
+<li>SyncPtr - доступен всем потокам (двум, в данном случае).</li>
+<li>&ldquo;Производитель&rdquo; берет несинхронизированный указатель на буфер (специально для него) и пишет туда данные.</li>
+<li>Атомарно обменивает свой (сырой указатель) с SyncPtr, делая его видимым для &ldquo;потребителя&rdquo; и скрывая текущий видимый буфер. И отправляется считать следующий пакет (или по любым его личным делам).</li>
+<li>В потоке &ldquo;получателя&rdquo; запрашивается текущий видимый буфер путем атомарного обмена указателей со своим буфером т.е. он выводит видимый буфер из обращения.</li>
+<li>Обрабатывает его сколько его душе угодно.</li>
+</ol>
+
+<p>Пункты 2-3 - цикл первого потока, 4-5 - второго.</p>
+
+<p>Теперь тоже самое в коде:</p>
+
+<pre><code class="language-cpp">class buffer {
+    std::array&lt;data, 3&gt; reserved;
+    data* reader_ = &amp;reserved[0];
+    data* writer_ = &amp;reserved[1];
+    std::atomic&lt;data*&gt; visible_{&amp;reserved[2]};
+
+public:
+    data* writer() noexcept { return writer_; }
+
+    void publish(data* writer_buffer) noexcept {
+        assert(writer_buffer == writer_);
+        writer_ = std::atomic_exchange(
+            &amp;visible_,
+            writer_,
+            std::memory_order_acq_rel);
+    }
+
+    data* reader() noexcept {
+        return std::atomic_exchange(
+            &amp;visible_,
+            reader_,
+            std::memory_order_acq_rel);
+    }
+};
+
+
+// Поток &quot;производителя&quot;
+while (true) {
+    const auto result = calculate(...);
+    data* b = buffer.writer();
+    result.serialize(b);
+    buffer.publish(b); // atomic operation
+}
+
+// Поток &quot;потребителя&quot;
+while (true) {
+    data* b = buffer.reader(); // atomic operation
+    send(compress(deserialize(b)));
+}
+</code></pre>
+
+<p>В итоге мы имеем всего две точки синхронизации - запрос буфера и его публикация. Причина, почему я пишу все это, в том, что понимание необходимости хранения буфера читателя заняло у меня некоторое время. Я думал хранить <code>nullptr</code> в <code>buffer::visible_</code> как сигнал, что обновлений нет, но это лишь переусложняло алгоритм (и делало его медленнее). Для определения наличия обновлений (если &ldquo;производитель&rdquo; где-то сильно задумался), можно очищать <code>data</code>, если это какой-то контейнер, или явно завести в нем <code>bool new_frame</code>, выставляя его при публикации и сбрасывая, после обработки.</p>
+
+<h2 id="эпилог">Эпилог</h2>
+
+<p>В общем получился достаточно компактный и инкапсулированный в класс wait-free алгоритм. Возможно, я открыл Америку, но я не нашел в интернете ничего похожего (возможно от незнания ключевого слова для такой структуры или в силу ее тривиальности). Надеюсь, кто-нибудь найдет эту статью полезной.</p>
+</div>
+        <div class="post_footer">
+          
+          <div class="meta">
+            <div class="info">
+              <span class="field tags">
+                <i class="remixicon-stack-line"></i>
+                
+                <a href="https://b8u.github.io/tags/concurrency/">concurrency</a>
+                
+                <a href="https://b8u.github.io/tags/cpp/">cpp</a>
+                
+              </span>
+            </div>
+          </div>
+          
+        </div>
+      </div>
+      
+      
+    </div>
+  </div>
+  <a id="back_to_top" href="#" class="back_to_top"><span>△</span></a>
+</div>
+<footer class="footer">
+  <div class="powered_by">
+    <a href="https://zeuk.me">Designed by Zeuk,</a>
+    <a href="http://www.gohugo.io/">Proudly published with Hugo</a>
+  </div>
+
+  <div class="footer_slogan">
+    <span></span>
+  </div>
+</footer>
+
+
+
+<script src="https://b8u.github.io/js/jquery-3.3.1.min.js"></script>
+<script src="https://b8u.github.io/js/zozo.js"></script>
+<script src="https://b8u.github.io/js/highlight.pack.js"></script>
+<link  href="https://b8u.github.io/css/fancybox.min.css" rel="stylesheet">
+<script src="https://b8u.github.io/js/fancybox.min.js"></script>
+
+<script>hljs.initHighlightingOnLoad()</script>
+
+
+
+
+<script type="application/javascript">
+var doNotTrack = false;
+if (!doNotTrack) {
+	window.ga=window.ga||function(){(ga.q=ga.q||[]).push(arguments)};ga.l=+new Date;
+	ga('create', 'UA-109070441-2', 'auto');
+	
+	ga('send', 'pageview');
+}
+</script>
+<script async src='https://www.google-analytics.com/analytics.js'></script>
+
+
+
+
+</body>
+</html>
